@@ -1,0 +1,78 @@
+version: "3.7"
+services:
+
+  db:
+    image: postgres:12.2-alpine
+    environment:
+      POSTGRES_DB: wiki
+      POSTGRES_PASSWORD: apassword
+      POSTGRES_USER: wikijs
+    logging:
+      driver: "none"
+    restart: unless-stopped
+    volumes:
+      - /pool/server/data/db-data:/var/lib/postgresql/data
+
+  wiki:
+    image: requarks/wiki:2
+    depends_on:
+      - db
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: wikijs
+      DB_PASS: apassword
+      DB_NAME: wiki
+      VIRTUAL_HOST: home.quinn,quinnfamily.info,www.quinnfamily.info
+      VIRTUAL_PORT: 3000
+      LETSENCRYPT_HOST: quinnfamily.info,www.quinnfamily.info
+      LETSENCRYPT_EMAIL: jeff.quinn@gmail.com
+    restart: unless-stopped
+    expose:
+      - "3000"
+    ports:
+      - "3000:3000"
+    volumes:
+      - '/pool/server/data/wiki/config.yml:/wiki/config.yml:rw'
+
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    container_name: nginx-proxy
+    depends_on:
+      - wiki
+    environment:
+      DEFAULT_HOST: home.quinn
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - '/var/run/docker.sock:/tmp/docker.sock:ro'
+      - '/pool/server/data/nginx-proxy/conf:/etc/nginx/conf.d/'
+      - '/pool/server/data/nginx-proxy/vhost:/etc/nginx/vhost.d/'
+      - '/pool/server/data/nginx-proxy/html:/usr/share/nginx/html/'
+      - '/pool/server/data/nginx-proxy/dhparam:/etc/nginx/dhparam/'
+      - '/pool/server/data/certs:/etc/nginx/certs:ro'
+
+  letsencrypt-companion:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: unless-stopped
+    container_name: nginx-proxy-le
+    environment:
+      NGINX_PROXY_CONTAINER: nginx-proxy
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - '/pool/server/data/nginx-proxy/conf:/etc/nginx/conf.d/'
+      - '/pool/server/data/nginx-proxy/vhost:/etc/nginx/vhost.d/'
+      - '/pool/server/data/nginx-proxy/html:/usr/share/nginx/html/'
+      - '/pool/server/data/nginx-proxy/dhparam:/etc/nginx/dhparam/'
+      - '/pool/server/data/certs:/etc/nginx/certs:rw'
+
+
+volumes:
+    db-data:
+    conf:
+    vhost:
+    html:
+    certs:
+
